@@ -151,6 +151,9 @@ public class H2TreeIndex extends H2TreeIndexBase {
     /** Query context registry. */
     private final QueryContextRegistry qryCtxRegistry;
 
+    /** IO statistics holder. */
+    private final IoStatisticsHolderIndex stats;
+
     /**
      * @param cctx Cache context.
      * @param tbl Table.
@@ -169,11 +172,14 @@ public class H2TreeIndex extends H2TreeIndexBase {
         String treeName,
         H2Tree[] segments,
         IndexColumn[] cols,
+        IoStatisticsHolderIndex stats,
         IgniteLogger log
     ) {
         super(tbl, idxName, cols,
             pk ? IndexType.createPrimaryKey(false, false) :
                 IndexType.createNonUnique(false, false, false));
+
+        this.stats = stats;
 
         this.cctx = cctx;
         ctx = cctx.kernalContext();
@@ -258,8 +264,8 @@ public class H2TreeIndex extends H2TreeIndexBase {
             SORTED_INDEX,
             cctx.name(),
             idxName,
-            cctx.kernalContext().metric(),
-            cctx.group().statisticsHolderData()
+            cctx.group().statisticsHolderData(),
+            cctx.kernalContext().metric()
         );
 
         cctx.kernalContext().ioStats().onIndexRegistered(
@@ -315,7 +321,7 @@ public class H2TreeIndex extends H2TreeIndexBase {
 
         IndexColumn.mapColumns(cols, tbl);
 
-        return new H2TreeIndex(cctx, tbl, idxName, pk, treeName, segments, cols, log);
+        return new H2TreeIndex(cctx, tbl, idxName, pk, treeName, segments, cols, stats, log);
     }
 
     /** {@inheritDoc} */
@@ -554,6 +560,8 @@ public class H2TreeIndex extends H2TreeIndexBase {
 
                     dropMetaPage(i);
                 }
+
+                ctx.metric().remove(stats.metricRegistryName());
 
                 if (async) {
                     DurableBackgroundTask task = new DurableBackgroundCleanupIndexTreeTask(
