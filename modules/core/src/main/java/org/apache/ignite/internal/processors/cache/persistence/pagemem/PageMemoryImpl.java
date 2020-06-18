@@ -1448,6 +1448,8 @@ public class PageMemoryImpl implements PageMemoryEx {
 
             try {
                 seg.resetGroupPartitionsGeneration(grpId);
+                seg.resetDirtyPages();
+                seg.checkpointPages = null;
             }
             finally {
                 seg.writeLock().unlock();
