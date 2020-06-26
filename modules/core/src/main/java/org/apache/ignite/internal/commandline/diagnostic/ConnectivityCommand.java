@@ -76,8 +76,14 @@ public class ConnectivityCommand implements Command<Void> {
     private void printResult(Map<ClusterNode, VisorConnectivityResult> res) {
         final boolean[] hasFailed = {false};
 
+        StringBuilder sb = new StringBuilder();
+
+        Integer longestId = res.keySet().stream().map(ClusterNode::id).map(UUID::toString).map(String::length).max(Integer::compareTo).orElse(0);
+
         for (Map.Entry<ClusterNode, VisorConnectivityResult> entry : res.entrySet()) {
             ClusterNode key = entry.getKey();
+
+            String id = key.id().toString();
 
             VisorConnectivityResult value = entry.getValue();
 
@@ -92,20 +98,24 @@ public class ConnectivityCommand implements Command<Void> {
                     if (status != ConnectivityStatus.OK) {
                         hasFailed[0] = true;
 
-                        return node + " is " + status.name().toLowerCase();
+                        // id1 {spaces to align all ids according to the longest} {tab sign} id2
+                        return String.format("%-" + longestId + "s\t%s", id, node);
                     }
 
                     return "";
                 })
                 .filter(s -> !s.isEmpty())
-                .collect(Collectors.joining(", "));
+                .collect(Collectors.joining("\n"));
 
-            if (!connectionStatus.isEmpty())
-                logger.info(key.id() + " status: " + connectionStatus + ". Connections to other nodes are ok");
+            sb.append(connectionStatus);
         }
 
-        if (!hasFailed[0])
-            logger.info("All nodes are connected");
+        if (hasFailed[0])
+            // SOURCE {spaces to align all ids according to the longest} {tab sign} DESTINATION
+            logger.info(String.format("There is no connectivity between the following nodes:\n%-"
+                    + longestId + "s\t%s\n%s", "SOURCE", "DESTINATION", sb));
+        else
+            logger.info("There are no connectivity problems.");
     }
 
     /** {@inheritDoc} */
