@@ -57,6 +57,7 @@ import org.apache.ignite.cache.query.ContinuousQuery;
 import org.apache.ignite.cache.query.QueryCursor;
 import org.apache.ignite.cache.query.ScanQuery;
 import org.apache.ignite.client.IgniteClient;
+import org.apache.ignite.cluster.ClusterState;
 import org.apache.ignite.configuration.CacheConfiguration;
 import org.apache.ignite.configuration.ClientConfiguration;
 import org.apache.ignite.configuration.DataRegionConfiguration;
@@ -845,7 +846,9 @@ public class JmxExporterSpiTest extends AbstractExporterSpiTest {
         assertTrue((boolean)mbn.getAttribute("isNodeInBaseline"));
         assertTrue((boolean)mbn.getAttribute("active"));
 
-        assertFalse((boolean)mbn.getAttribute("readOnlyMode"));
+        long clusterStateChangeTime = (long)mbn.getAttribute("lastClusterStateChangeTime");
+
+        assertTrue(0 < clusterStateChangeTime && clusterStateChangeTime < System.currentTimeMillis());
 
         assertTrue((long)mbn.getAttribute("startTimestamp") > 0);
         assertTrue((long)mbn.getAttribute("uptime") > 0);
@@ -859,7 +862,6 @@ public class JmxExporterSpiTest extends AbstractExporterSpiTest {
 
         assertEquals(0L, mbn.getAttribute("longJVMPausesCount"));
         assertEquals(0L, mbn.getAttribute("longJVMPausesTotalDuration"));
-        assertEquals(0L, mbn.getAttribute("readOnlyModeDuration"));
 
         assertEquals(String.valueOf(ignite.configuration().getPublicThreadPoolSize()),
                 mbn.getAttribute("executorServiceFormatted"));
@@ -878,6 +880,8 @@ public class JmxExporterSpiTest extends AbstractExporterSpiTest {
 
         assertEquals(ignite.configuration().getMBeanServer().toString(),
                 (String)mbn.getAttribute("mBeanServerFormatted"));
+
+        assertEquals(ClusterState.ACTIVE.toString(), mbn.getAttribute("clusterState"));
     }
 
     /** */
