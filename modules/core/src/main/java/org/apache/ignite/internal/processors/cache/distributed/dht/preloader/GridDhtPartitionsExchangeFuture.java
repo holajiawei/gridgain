@@ -1718,6 +1718,18 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
             }
         }
 
+        // After all partitions have been restored and pre-created it's safe to make first checkpoint.
+        if (localJoinExchange() || activateCluster()) {
+            cctx.exchange().exchangerBlockingSectionBegin();
+
+            try {
+                cctx.database().onStateRestored(initialVersion());
+            }
+            finally {
+                cctx.exchange().exchangerBlockingSectionEnd();
+            }
+        }
+
         timeBag.finishGlobalStage("After states restored callback");
 
         cctx.exchange().exchangerBlockingSectionBegin();
@@ -2492,19 +2504,6 @@ public class GridDhtPartitionsExchangeFuture extends GridDhtTopologyFutureAdapte
 
             // Create and destroy caches and cache proxies.
             cctx.cache().onExchangeDone(initialVersion(), exchActions, err);
-
-            // After all partitions have been restored and pre-created and also rebalance cancelled
-            // it's safe to make first checkpoint.
-            if (localJoinExchange() || activateCluster()) {
-                cctx.exchange().exchangerBlockingSectionBegin();
-
-                try {
-                    cctx.database().onStateRestored(initialVersion());
-                }
-                finally {
-                    cctx.exchange().exchangerBlockingSectionEnd();
-                }
-            }
 
             cctx.kernalContext().authentication().onActivate();
 
