@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.ignite.IgniteException;
 import org.apache.ignite.cluster.ClusterGroup;
@@ -81,17 +82,16 @@ public class VisorConnectivityTask
                 .filter(uuid -> !Objects.equals(ignite.configuration().getNodeId().toString(), uuid.toString()))
                 .collect(Collectors.toList());
 
-            Map<String, ConnectivityStatus> unavailableNodes = new ArrayList<>(ids).stream()
-                .collect(Collectors.toMap(UUID::toString, uuid -> {
-                    ClusterGroup node = ignite.cluster().forNodeId(uuid);
-
-                    if (node.nodes().isEmpty())
+            Map<ClusterNode, ConnectivityStatus> unavailableNodes = new ArrayList<>(ids).stream()
+                .map(uuid -> ignite.cluster().forNodeId(uuid).node())
+                .collect(Collectors.toMap(Function.identity(), node -> {
+                    if (node == null)
                         return ConnectivityStatus.MISSING;
 
                     boolean res;
 
                     try {
-                        res = ignite.configuration().getCommunicationSpi().ping(node.node());
+                        res = ignite.configuration().getCommunicationSpi().ping(node);
                     }
                     catch (IgniteException e) {
                         return ConnectivityStatus.UNAVAILABLE;

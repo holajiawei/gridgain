@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.Map;
+import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.internal.dto.IgniteDataTransferObject;
 import org.apache.ignite.internal.util.typedef.internal.U;
 import org.jetbrains.annotations.Nullable;
@@ -32,7 +33,7 @@ public class VisorConnectivityResult extends IgniteDataTransferObject {
     private static final long serialVersionUID = 0L;
 
     /** */
-    @Nullable private Map<String, ConnectivityStatus> nodeStatuses;
+    @Nullable private Map<ClusterNode, ConnectivityStatus> nodeStatuses;
 
     /**
      * Default constructor.
@@ -43,7 +44,7 @@ public class VisorConnectivityResult extends IgniteDataTransferObject {
     /**
      * @param nodeStatuses Node statuses.
      */
-    public VisorConnectivityResult(@Nullable Map<String, ConnectivityStatus> nodeStatuses) {
+    public VisorConnectivityResult(@Nullable Map<ClusterNode, ConnectivityStatus> nodeStatuses) {
         this.nodeStatuses = nodeStatuses;
     }
 
@@ -60,7 +61,7 @@ public class VisorConnectivityResult extends IgniteDataTransferObject {
     /**
      * Get connectivity statuses for a node
      */
-    public @Nullable Map<String, ConnectivityStatus> getNodeIds() {
+    public @Nullable Map<ClusterNode, ConnectivityStatus> getNodeIds() {
         return nodeStatuses;
     }
 

@@ -16,6 +16,8 @@
 
 package org.apache.ignite.internal.commandline.diagnostic;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -78,44 +80,103 @@ public class ConnectivityCommand implements Command<Void> {
 
         StringBuilder sb = new StringBuilder();
 
-        Integer longestId = res.keySet().stream().map(ClusterNode::id).map(UUID::toString).map(String::length).max(Integer::compareTo).orElse(0);
+        int tmpLongestId = 0;
+        int tmpLongestConsistentId = 0;
+
+        for (ClusterNode clusterNode : res.keySet()) {
+            int idLength = clusterNode.id().toString().length();
+            int consIdLength = clusterNode.consistentId().toString().length();
+
+            if (idLength > tmpLongestId)
+                tmpLongestId = idLength;
+
+            if (consIdLength > tmpLongestConsistentId)
+                tmpLongestConsistentId = consIdLength;
+        }
+
+        final int longestId = tmpLongestId;
+        final int longestConsistentId = tmpLongestConsistentId;
 
         for (Map.Entry<ClusterNode, VisorConnectivityResult> entry : res.entrySet()) {
             ClusterNode key = entry.getKey();
 
             String id = key.id().toString();
+            String consId = key.consistentId().toString();
+            boolean isClient = key.isClient();
 
             VisorConnectivityResult value = entry.getValue();
 
-            Map<String, ConnectivityStatus> statuses = value.getNodeIds();
+            Map<ClusterNode, ConnectivityStatus> statuses = value.getNodeIds();
 
-            String connectionStatus = statuses.entrySet().stream()
-                .map(nodeStat -> {
-                    String node = nodeStat.getKey();
+            statuses.entrySet().stream().map(nodeStat -> {
+                ClusterNode remoteNode = nodeStat.getKey();
 
-                    ConnectivityStatus status = nodeStat.getValue();
+                String remoteId = remoteNode.id().toString();
+                String remoteConsId = remoteNode.consistentId().toString();
+                boolean remoteIsClient = remoteNode.isClient();
 
-                    if (status != ConnectivityStatus.OK) {
-                        hasFailed[0] = true;
+                return Arrays.asList(id, consId, isClient, remoteId, remoteConsId, remoteIsClient);
+            });
 
-                        // id1 {spaces to align all ids according to the longest} {tab sign} id2
-                        return String.format("%-" + longestId + "s\t%s", id, node);
-                    }
-
-                    return "";
-                })
-                .filter(s -> !s.isEmpty())
-                .collect(Collectors.joining("\n"));
-
-            sb.append(connectionStatus);
+//            String connectionStatus = statuses.entrySet().stream()
+//                .map(nodeStat -> {
+//                    ClusterNode remoteNode = nodeStat.getKey();
+//
+//                    String remoteId = remoteNode.id().toString();
+//                    String remoteConsId = remoteNode.consistentId().toString();
+//                    boolean remoteIsClient = remoteNode.isClient();
+//
+//                    ConnectivityStatus status = nodeStat.getValue();
+//
+//                    if (status != ConnectivityStatus.OK) {
+//                        hasFailed[0] = true;
+//
+//                        // id1 {spaces to align all ids according to the longest} {tab sign} id2
+//                        return String.format("%-" + longestId + "s\t%-" + longestConsistentId + "s\t%s\t%s\t%" + longestConsistentId + "s\t%s",
+//                                id, consId, isClient, remoteId, remoteConsId, remoteIsClient);
+//                    }
+//
+//                    return "";
+//                })
+//                .filter(s -> !s.isEmpty())
+//                .collect(Collectors.joining("\n"));
+//
+//            sb.append(connectionStatus);
         }
 
         if (hasFailed[0])
             // SOURCE {spaces to align all ids according to the longest} {tab sign} DESTINATION
             logger.info(String.format("There is no connectivity between the following nodes:\n%-"
-                    + longestId + "s\t%s\n%s", "SOURCE", "DESTINATION", sb));
+                    + longestId + "s\t%-" + longestConsistentId + "s\t%s\t%s\t%-" + longestConsistentId + "s\t%s\n%s",
+                    "SOURCE", "SOURCE_CONS_ID", "SOURCE_CLIENT", "DESTINATION", "DESTINATION_CONS_ID",
+                    "DESTINATION_CLIENT", sb));
         else
             logger.info("There are no connectivity problems.");
+    }
+
+    public static String formatAsTable(List<List<String>> rows) {
+        int[] maxLengths = new int[rows.get(0).size()];
+        for (List<String> row : rows)
+        {
+            for (int i = 0; i < row.size(); i++)
+            {
+                maxLengths[i] = Math.max(maxLengths[i], row.get(i).length());
+            }
+        }
+
+        StringBuilder formatBuilder = new StringBuilder();
+        for (int maxLength : maxLengths)
+        {
+            formatBuilder.append("%-").append(maxLength + 2).append("s");
+        }
+        String format = formatBuilder.toString();
+
+        StringBuilder result = new StringBuilder();
+        for (List<String> row : rows)
+        {
+            result.append(String.format(format, row.toArray(new String[0]))).append("\n");
+        }
+        return result.toString();
     }
 
     /** {@inheritDoc} */
