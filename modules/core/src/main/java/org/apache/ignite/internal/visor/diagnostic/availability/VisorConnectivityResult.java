@@ -33,7 +33,7 @@ public class VisorConnectivityResult extends IgniteDataTransferObject {
     private static final long serialVersionUID = 0L;
 
     /** */
-    @Nullable private Map<ClusterNode, ConnectivityStatus> nodeStatuses;
+    @Nullable private Map<ClusterNode, Boolean> nodeStatuses;
 
     /**
      * Default constructor.
@@ -44,7 +44,7 @@ public class VisorConnectivityResult extends IgniteDataTransferObject {
     /**
      * @param nodeStatuses Node statuses.
      */
-    public VisorConnectivityResult(@Nullable Map<ClusterNode, ConnectivityStatus> nodeStatuses) {
+    public VisorConnectivityResult(@Nullable Map<ClusterNode, Boolean> nodeStatuses) {
         this.nodeStatuses = nodeStatuses;
     }
 
@@ -61,7 +61,7 @@ public class VisorConnectivityResult extends IgniteDataTransferObject {
     /**
      * Get connectivity statuses for a node
      */
-    public @Nullable Map<ClusterNode, ConnectivityStatus> getNodeIds() {
+    public @Nullable Map<ClusterNode, Boolean> getNodeIds() {
         return nodeStatuses;
     }
 

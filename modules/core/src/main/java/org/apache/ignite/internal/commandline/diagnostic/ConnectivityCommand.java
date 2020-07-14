@@ -16,9 +16,12 @@
 
 package org.apache.ignite.internal.commandline.diagnostic;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Logger;
@@ -31,7 +34,6 @@ import org.apache.ignite.internal.commandline.Command;
 import org.apache.ignite.internal.commandline.TaskExecutor;
 import org.apache.ignite.internal.visor.diagnostic.availability.VisorConnectivityArgs;
 import org.apache.ignite.internal.visor.diagnostic.availability.VisorConnectivityResult;
-import org.apache.ignite.internal.visor.diagnostic.availability.ConnectivityStatus;
 import org.apache.ignite.internal.visor.diagnostic.availability.VisorConnectivityTask;
 
 import static org.apache.ignite.internal.commandline.CommandHandler.UTILITY_NAME;
@@ -78,104 +80,74 @@ public class ConnectivityCommand implements Command<Void> {
     private void printResult(Map<ClusterNode, VisorConnectivityResult> res) {
         final boolean[] hasFailed = {false};
 
-        StringBuilder sb = new StringBuilder();
-
-        int tmpLongestId = 0;
-        int tmpLongestConsistentId = 0;
-
-        for (ClusterNode clusterNode : res.keySet()) {
-            int idLength = clusterNode.id().toString().length();
-            int consIdLength = clusterNode.consistentId().toString().length();
-
-            if (idLength > tmpLongestId)
-                tmpLongestId = idLength;
-
-            if (consIdLength > tmpLongestConsistentId)
-                tmpLongestConsistentId = consIdLength;
-        }
-
-        final int longestId = tmpLongestId;
-        final int longestConsistentId = tmpLongestConsistentId;
+        final List<List<String>> table = new ArrayList<>();
+        table.add(Arrays.asList("SOURCE", "SOURCE_CONS_ID", "SOURCE_CLIENT", "DESTINATION", "DESTINATION_CONS_ID",
+                "DESTINATION_CLIENT"));
 
         for (Map.Entry<ClusterNode, VisorConnectivityResult> entry : res.entrySet()) {
             ClusterNode key = entry.getKey();
 
             String id = key.id().toString();
             String consId = key.consistentId().toString();
-            boolean isClient = key.isClient();
+            String isClient = String.valueOf(key.isClient());
 
             VisorConnectivityResult value = entry.getValue();
 
-            Map<ClusterNode, ConnectivityStatus> statuses = value.getNodeIds();
+            Map<ClusterNode, Boolean> statuses = value.getNodeIds();
 
-            statuses.entrySet().stream().map(nodeStat -> {
+            List<List<String>> row = statuses.entrySet().stream().map(nodeStat -> {
                 ClusterNode remoteNode = nodeStat.getKey();
 
                 String remoteId = remoteNode.id().toString();
                 String remoteConsId = remoteNode.consistentId().toString();
-                boolean remoteIsClient = remoteNode.isClient();
+                String remoteIsClient = String.valueOf(remoteNode.isClient());
 
-                return Arrays.asList(id, consId, isClient, remoteId, remoteConsId, remoteIsClient);
-            });
+                Boolean status = nodeStat.getValue();
 
-//            String connectionStatus = statuses.entrySet().stream()
-//                .map(nodeStat -> {
-//                    ClusterNode remoteNode = nodeStat.getKey();
-//
-//                    String remoteId = remoteNode.id().toString();
-//                    String remoteConsId = remoteNode.consistentId().toString();
-//                    boolean remoteIsClient = remoteNode.isClient();
-//
-//                    ConnectivityStatus status = nodeStat.getValue();
-//
-//                    if (status != ConnectivityStatus.OK) {
-//                        hasFailed[0] = true;
-//
-//                        // id1 {spaces to align all ids according to the longest} {tab sign} id2
-//                        return String.format("%-" + longestId + "s\t%-" + longestConsistentId + "s\t%s\t%s\t%" + longestConsistentId + "s\t%s",
-//                                id, consId, isClient, remoteId, remoteConsId, remoteIsClient);
-//                    }
-//
-//                    return "";
-//                })
-//                .filter(s -> !s.isEmpty())
-//                .collect(Collectors.joining("\n"));
-//
-//            sb.append(connectionStatus);
+                if (!status) {
+                    hasFailed[0] = true;
+                    return Arrays.asList(id, consId, isClient, remoteId, remoteConsId, remoteIsClient);
+                }
+
+                return null;
+            })
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+
+            table.addAll(row);
         }
 
         if (hasFailed[0])
-            // SOURCE {spaces to align all ids according to the longest} {tab sign} DESTINATION
-            logger.info(String.format("There is no connectivity between the following nodes:\n%-"
-                    + longestId + "s\t%-" + longestConsistentId + "s\t%s\t%s\t%-" + longestConsistentId + "s\t%s\n%s",
-                    "SOURCE", "SOURCE_CONS_ID", "SOURCE_CLIENT", "DESTINATION", "DESTINATION_CONS_ID",
-                    "DESTINATION_CLIENT", sb));
+            logger.info("There is no connectivity between the following nodes:\n" + formatAsTable(table));
         else
             logger.info("There are no connectivity problems.");
     }
 
+    /**
+     * Format output as a table
+     * @param rows table rows.
+     * @return formatted string.
+     */
     public static String formatAsTable(List<List<String>> rows) {
         int[] maxLengths = new int[rows.get(0).size()];
-        for (List<String> row : rows)
-        {
+
+        for (List<String> row : rows) {
             for (int i = 0; i < row.size(); i++)
-            {
                 maxLengths[i] = Math.max(maxLengths[i], row.get(i).length());
-            }
         }
 
         StringBuilder formatBuilder = new StringBuilder();
+
         for (int maxLength : maxLengths)
-        {
             formatBuilder.append("%-").append(maxLength + 2).append("s");
-        }
+
         String format = formatBuilder.toString();
 
         StringBuilder result = new StringBuilder();
+
         for (List<String> row : rows)
-        {
             result.append(String.format(format, row.toArray(new String[0]))).append("\n");
-        }
+
         return result.toString();
     }
 

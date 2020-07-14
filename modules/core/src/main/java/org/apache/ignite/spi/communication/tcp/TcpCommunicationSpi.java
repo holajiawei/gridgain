@@ -1071,20 +1071,6 @@ public class TcpCommunicationSpi extends TcpCommunicationConfigInitializer {
         sendMessage0(node, msg, ackC);
     }
 
-    /** {@inheritDoc} */
-    @Override public boolean ping(ClusterNode node) {
-        try {
-            GridCommunicationClient client = clientPool.reserveClient(node, 0, true);
-            client.release();
-            client.close();
-            return true;
-        }
-        catch (IgniteCheckedException e) {
-            log.warning("Failed to ping node " + node.id() + ": " + e.getMessage(), e);
-        }
-        return false;
-    }
-
     /**
      * @param node Destination node.
      * @param msg Message to send.

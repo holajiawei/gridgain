@@ -17,15 +17,15 @@
 package org.apache.ignite.internal.visor.diagnostic.availability;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.ignite.IgniteException;
-import org.apache.ignite.cluster.ClusterGroup;
 import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.compute.ComputeJobResult;
 import org.apache.ignite.internal.processors.task.GridInternal;
@@ -33,10 +33,12 @@ import org.apache.ignite.internal.util.typedef.internal.S;
 import org.apache.ignite.internal.visor.VisorJob;
 import org.apache.ignite.internal.visor.VisorMultiNodeTask;
 import org.apache.ignite.internal.visor.VisorTaskArgument;
+import org.apache.ignite.spi.communication.CommunicationSpi;
+import org.apache.ignite.spi.communication.tcp.TcpCommunicationSpi;
 import org.jetbrains.annotations.Nullable;
 
 /**
- *
+ * Visor task that checks connectivity status between nodes.
  */
 @GridInternal
 public class VisorConnectivityTask
@@ -82,28 +84,24 @@ public class VisorConnectivityTask
                 .filter(uuid -> !Objects.equals(ignite.configuration().getNodeId().toString(), uuid.toString()))
                 .collect(Collectors.toList());
 
-            Map<ClusterNode, ConnectivityStatus> unavailableNodes = new ArrayList<>(ids).stream()
-                .map(uuid -> ignite.cluster().forNodeId(uuid).node())
-                .collect(Collectors.toMap(Function.identity(), node -> {
-                    if (node == null)
-                        return ConnectivityStatus.MISSING;
+            List<ClusterNode> nodes = new ArrayList<>(ignite.cluster().forNodeIds(ids).nodes());
 
-                    boolean res;
+            CommunicationSpi spi = ignite.configuration().getCommunicationSpi();
 
-                    try {
-                        res = ignite.configuration().getCommunicationSpi().ping(node);
-                    }
-                    catch (IgniteException e) {
-                        return ConnectivityStatus.UNAVAILABLE;
-                    }
+            Map<ClusterNode, Boolean> statuses = new HashMap<>();
 
-                    if (!res)
-                        return ConnectivityStatus.UNAVAILABLE;
+            if (spi instanceof TcpCommunicationSpi) {
+                BitSet set = ((TcpCommunicationSpi) spi).checkConnection(nodes).get();
 
-                    return ConnectivityStatus.OK;
-                }));
+                for (int i = 0; i < nodes.size(); i++) {
+                    ClusterNode node = nodes.get(i);
+                    boolean success = set.get(i);
 
-            return new VisorConnectivityResult(unavailableNodes);
+                    statuses.put(node, success);
+                }
+            }
+
+            return new VisorConnectivityResult(statuses);
         }
 
         /** {@inheritDoc} */
